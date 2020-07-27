@@ -75,7 +75,7 @@ object MockThrottlingService extends ThrottlingService {
       case None     => isRequestAllowedByUser("unauthorized", graceRps)
       case Some(tk) =>
         val sla = try {
-          Await.result(SlaCache.getSlaByToken(tk), 200.millis)
+          Await.result(SlaCache.getSlaByToken(tk), 4.millis)
         } catch {
           case e: TimeoutException => Sla("unauthorized", graceRps)
         }
