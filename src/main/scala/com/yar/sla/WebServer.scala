@@ -4,10 +4,16 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.yar.sla.MockThrottlingService
+import akka.http.scaladsl.model.headers._
 
 import scala.io.StdIn
 
 object WebServer {
+  def extractAuthToken: HttpHeader => Option[String] = {
+    case r: RawHeader if r.name == "Authentication" => Some(r.value)
+    case x         => None
+  }
+
   def main(args: Array[String]) {
     implicit val system = ActorSystem("my-system")
     implicit val materializer = ActorMaterializer()
@@ -20,20 +26,20 @@ object WebServer {
       "tk2" -> "Chris"
     )
 
-    val route = parameters(Symbol("authToken").?) { authToken =>
-      concat(
+    def greetUser(authToken: Option[String], message: Option[String]) = complete {
+      val userName = authToken.flatMap(users.get).fold("guest")(identity)
+      s"Hello $userName!" + message.fold("")(" " + _)
+    }
+
+    val route = optionalHeaderValueByName("Authorization") { authToken =>
+      concat (
         path("noThrottle") {
-          get {
-            complete {
-              val userName = authToken.flatMap(users.get).fold("guest")(identity)
-              s"Hello $userName!"
-            }
-          }
+          get(greetUser(authToken, None))
         },
         pathSingleSlash {
           get {
             if (MockThrottlingService.isRequestAllowed(authToken)) {
-              complete("Hi!")
+              greetUser(authToken, Some("Welcome to ThrottlingService!"))
             } else {
               complete(StatusCodes.TooManyRequests)
             }
