@@ -9,11 +9,6 @@ import akka.http.scaladsl.model.headers._
 import scala.io.StdIn
 
 object WebServer {
-  def extractAuthToken: HttpHeader => Option[String] = {
-    case r: RawHeader if r.name == "Authentication" => Some(r.value)
-    case x         => None
-  }
-
   def main(args: Array[String]) {
     implicit val system = ActorSystem("my-system")
     implicit val materializer = ActorMaterializer()
@@ -31,18 +26,19 @@ object WebServer {
       s"Hello $userName!" + message.fold("")(" " + _)
     }
 
+    def extractAuthToken: HttpHeader => Option[String] = {
+      case r: RawHeader if r.name == "Authentication" => Some(r.value)
+      case x         => None
+    }
+
     val route = optionalHeaderValueByName("Authorization") { authToken =>
       concat (
-        path("noThrottle") {
-          get(greetUser(authToken, None))
-        },
-        pathSingleSlash {
-          get {
-            if (MockThrottlingService.isRequestAllowed(authToken)) {
-              greetUser(authToken, Some("Welcome to ThrottlingService!"))
-            } else {
-              complete(StatusCodes.TooManyRequests)
-            }
+        path("noThrottle") & get & greetUser(authToken, None),
+        (pathSingleSlash & get) {
+          if (MockThrottlingService.isRequestAllowed(authToken)) {
+            greetUser(authToken, Some("Welcome to ThrottlingService!"))
+          } else {
+            complete(StatusCodes.TooManyRequests)
           }
         }
       )
