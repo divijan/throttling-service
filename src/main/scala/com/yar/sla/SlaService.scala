@@ -8,7 +8,6 @@ import scalacache.modes.sync._
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 
 case class Sla(user: String, rps: Int)
 

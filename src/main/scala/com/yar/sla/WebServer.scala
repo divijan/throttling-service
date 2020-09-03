@@ -3,9 +3,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import com.yar.sla.MockThrottlingService
+import com.yar.sla._
 import akka.http.scaladsl.model.headers._
+import com.typesafe.config.ConfigFactory
 
+import scala.concurrent.Future
 import scala.io.StdIn
 
 object WebServer {
@@ -14,6 +16,22 @@ object WebServer {
     implicit val materializer = ActorMaterializer()
     // needed for the future flatMap/onComplete in the end
     implicit val executionContext = system.dispatcher
+
+    val slaService: SlaService = new SlaService {
+      val table = Map(
+        "tk2" -> Sla("John", 30),
+        "tk1" -> Sla("Chris", 15),
+        "tk3" -> Sla("John", 30)
+      )
+
+      override def getSlaByToken(token: String): Future[Sla] = {
+        Future {
+          Thread.sleep(250)
+          table(token)
+        }// no requirements what to do if no Sla found for token, so we just fail inside the Future
+      }
+    }
+    val ts = new MyThrottlingService(ConfigFactory.load().getInt("graceRps"), slaService)
 
     val users = Map(
       "tk1" -> "John",
@@ -35,7 +53,7 @@ object WebServer {
       concat (
         path("noThrottle") & get & greetUser(authToken, None),
         (pathSingleSlash & get) {
-          if (MockThrottlingService.isRequestAllowed(authToken)) {
+          if (ts.isRequestAllowed(authToken)) {
             greetUser(authToken, Some("Welcome to ThrottlingService!"))
           } else {
             complete(StatusCodes.TooManyRequests)

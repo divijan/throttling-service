@@ -10,5 +10,7 @@ libraryDependencies ++= Seq(
   "com.github.cb372" %% "scalacache-caffeine" % "0.28.0",
   "com.typesafe.akka" %% "akka-http"   % "10.1.12",
   "com.typesafe.akka" %% "akka-stream" % "2.5.26",
-  "org.specs2" %% "specs2-core" % "4.10.0" % "test"
+  //"org.specs2" %% "specs2-core" % "4.10.0" % "test",
+  "org.scalatest" %% "scalatest" % "3.2.0" % "test",
+  "org.scalamock" %% "scalamock" % "5.0.0" % Test
 )
