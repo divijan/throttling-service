@@ -5,22 +5,16 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeoutException}
 
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scalacache._
-import scalacache.caffeine._
-import scalacache.modes.sync._
-
 import scala.jdk.CollectionConverters._
-import akka.actor.ActorSystem
 
 
 trait ThrottlingService {
   val graceRps: Int // configurable
   val slaService: SlaService // use mocks/stubs for testing
   // Should return true if the request is within allowed RPS.
-  def isRequestAllowed(token:Option[String]): Boolean
+  def isRequestAllowed(token: Option[String]): Boolean
 }
 
 object MockThrottlingService extends ThrottlingService {
@@ -31,6 +25,7 @@ object MockThrottlingService extends ThrottlingService {
       "tk1" -> Sla("Chris", 15),
       "tk3" -> Sla("John", 30)
     )
+
     override def getSlaByToken(token: String): Future[Sla] = {
       Future {
         Thread.sleep(250)
@@ -39,22 +34,12 @@ object MockThrottlingService extends ThrottlingService {
     }
   }
 
-
-  object SlaCache {
-    implicit val slaCache: Cache[Sla] = CaffeineCache[Sla]
-    def getSlaByToken(token: String): Future[Sla] = {
-      Future(slaCache.get(token).get).recoverWith { _ =>
-        val slaFromService = slaService.getSlaByToken(token)
-        slaFromService.foreach(sla => slaCache.put(token)(sla, Some(1.day)))
-        slaFromService
-      }
-    }
-  }
+  private val slaSrvFrontend = new SlaServiceFrontend(slaService)
 
   val rpsCounter = new ConcurrentHashMap[String, (Instant, Int)]().asScala
 
   override def isRequestAllowed(token: Option[String]): Boolean = {
-    def isRequestAllowedByUser(user: String, rps: Int) = rpsCounter.get(user).fold {
+    def isRequestAllowedForUser(user: String, rps: Int) = rpsCounter.get(user).fold {
       rpsCounter.addOne(user -> (Instant.now(), 1))
       1 <= rps
     } { tuple =>
@@ -72,14 +57,10 @@ object MockThrottlingService extends ThrottlingService {
     }
 
     token match {
-      case None     => isRequestAllowedByUser("unauthorized", graceRps)
+      case None     => isRequestAllowedForUser("unauthorized", graceRps)
       case Some(tk) =>
-        val sla = try {
-          Await.result(SlaCache.getSlaByToken(tk), 4.millis)
-        } catch {
-          case e: TimeoutException => Sla("unauthorized", graceRps)
-        }
-        isRequestAllowedByUser(sla.user, sla.rps)
+        val sla = slaSrvFrontend.getSlaByToken(tk) getOrElse Sla("unauthorized", graceRps)
+        isRequestAllowedForUser(sla.user, sla.rps)
     }
   }
 }
