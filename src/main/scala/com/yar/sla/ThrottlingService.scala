@@ -1,11 +1,7 @@
 package com.yar.sla
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeoutException}
-
-import com.typesafe.config.ConfigFactory
-
-import scala.concurrent.Future
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters._
 
@@ -17,29 +13,13 @@ trait ThrottlingService {
   def isRequestAllowed(token: Option[String]): Boolean
 }
 
-object MockThrottlingService extends ThrottlingService {
-  override val graceRps: Int = ConfigFactory.load().getInt("graceRps")
-  override val slaService: SlaService = new SlaService {
-    val table = Map(
-      "tk2" -> Sla("John", 30),
-      "tk1" -> Sla("Chris", 15),
-      "tk3" -> Sla("John", 30)
-    )
-
-    override def getSlaByToken(token: String): Future[Sla] = {
-      Future {
-        Thread.sleep(250)
-        table(token)
-      }// no requirements what to do if no Sla found for token, so we just fail inside the Future
-    }
-  }
-
+class MyThrottlingService(val graceRps: Int, val slaService: SlaService) extends ThrottlingService {
   private val slaSrvFrontend = new SlaServiceFrontend(slaService)
+  private val rpsCounter = new ConcurrentHashMap[String, (Instant, Int)]().asScala
 
-  val rpsCounter = new ConcurrentHashMap[String, (Instant, Int)]().asScala
 
   override def isRequestAllowed(token: Option[String]): Boolean = {
-    def isRequestAllowedByUser(user: String, rps: Int) = rpsCounter.get(user).fold {
+    def isRequestAllowedForUser(user: String, rps: Int) = rpsCounter.get(user).fold {
       rpsCounter.addOne(user -> (Instant.now(), 1))
       1 <= rps
     } { tuple =>
@@ -57,14 +37,10 @@ object MockThrottlingService extends ThrottlingService {
     }
 
     token match {
-      case None     => isRequestAllowedByUser("unauthorized", graceRps)
+      case None     => isRequestAllowedForUser("unauthorized", graceRps)
       case Some(tk) =>
-        val optSla = try {
-          slaSrvFrontend.getSlaByToken(tk)
-        } catch {
-          case e: TimeoutException => Some(Sla("unauthorized", graceRps))
-        }
-        optSla.fold(isRequestAllowedByUser("unauthorized", graceRps))(sla => isRequestAllowedByUser(sla.user, sla.rps))
+        val sla = slaSrvFrontend.getSlaByToken(tk) getOrElse Sla("unauthorized", graceRps)
+        isRequestAllowedForUser(sla.user, sla.rps)
     }
   }
 }
