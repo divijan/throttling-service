@@ -1,3 +1,5 @@
+This is a test assignment I received in 2018 the first time. In 2020 I was asked to complete it again. This time I actually got round to it
+
 Goal
 ----
 To provide Service Level Agreement (SLA) for our REST endpoint the
