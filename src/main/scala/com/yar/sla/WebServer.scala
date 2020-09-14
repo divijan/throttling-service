@@ -26,7 +26,7 @@ object WebServer {
 
       override def getSlaByToken(token: String): Future[Sla] = {
         Future {
-          Thread.sleep(250)
+          Thread.sleep(250) //does something heavy
           table(token)
         }// no requirements what to do if no Sla found for token, so we just fail inside the Future
       }
