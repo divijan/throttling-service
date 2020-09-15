@@ -11,34 +11,34 @@ import scala.concurrent.Future
 import scala.io.StdIn
 
 object WebServer {
-  def main(args: Array[String]) {
-    implicit val system = ActorSystem("my-system")
-    implicit val materializer = ActorMaterializer()
-    // needed for the future flatMap/onComplete in the end
-    implicit val executionContext = system.dispatcher
+  implicit val system = ActorSystem("my-system")
+  implicit val materializer = ActorMaterializer()
+  // needed for the future flatMap/onComplete in the end
+  implicit val executionContext = system.dispatcher
 
-    val slaService: SlaService = new SlaService {
-      val table = Map(
-        "tk2" -> Sla("John", 30),
-        "tk1" -> Sla("Chris", 15),
-        "tk3" -> Sla("John", 30)
-      )
-
-      override def getSlaByToken(token: String): Future[Sla] = {
-        Future {
-          Thread.sleep(250) //does something heavy
-          table(token)
-        }// no requirements what to do if no Sla found for token, so we just fail inside the Future
-      }
-    }
-    val ts = new MyThrottlingService(ConfigFactory.load().getInt("graceRps"), slaService)
-
-    val users = Map(
-      "tk1" -> "John",
-      "tk3" -> "John",
-      "tk2" -> "Chris"
+  val slaService: SlaService = new SlaService {
+    val table = Map(
+      "tk2" -> Sla("John", 30),
+      "tk1" -> Sla("Chris", 15),
+      "tk3" -> Sla("John", 30)
     )
 
+    override def getSlaByToken(token: String): Future[Sla] = {
+      Future {
+        Thread.sleep(250) //does something heavy
+        table(token)
+      }// no requirements what to do if no Sla found for token, so we just fail inside the Future
+    }
+  }
+  val ts = new MyThrottlingService(ConfigFactory.load().getInt("graceRps"), slaService)
+
+  val users = Map(
+    "tk1" -> "John",
+    "tk3" -> "John",
+    "tk2" -> "Chris"
+  )
+
+  def main(args: Array[String]) {
     def greetUser(authToken: Option[String], message: Option[String]) = complete {
       val userName = authToken.flatMap(users.get).fold("guest")(identity)
       s"Hello $userName!" + message.fold("")(" " + _)
