@@ -66,8 +66,11 @@ class MyThrottlingServiceSpec extends AnyFlatSpec with Matchers with MockFactory
     for (_ <- 1 to 10) yield {
       ts.isRequestAllowed(Some("Hans")) shouldEqual true
     }
-    println(s"${System.currentTimeMillis() - now} millis elapsed")
-    Thread.sleep(100)
     ts.isRequestAllowed(Some("Hans")) shouldEqual false //not enough time elapsed
+    val elapsed = System.currentTimeMillis() - now
+    println(s"$elapsed millis elapsed")
+    Thread.sleep(1100 - elapsed)
+    println(s"${System.currentTimeMillis() - now} millis elapsed")
+    ts.isRequestAllowed(Some("Hans")) shouldEqual true
   }
 }

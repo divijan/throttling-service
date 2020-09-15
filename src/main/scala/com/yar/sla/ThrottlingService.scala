@@ -20,20 +20,17 @@ class MyThrottlingService(val graceRps: Int, val slaService: SlaService) extends
 
   override def isRequestAllowed(token: Option[String]): Boolean = {
     def isRequestAllowedForUser(user: String, rps: Int) = rpsCounter.get(user).fold {
-      rpsCounter.addOne(user -> (Instant.now(), 1))
-      1 <= rps
-    } { tuple =>
-      val (oldTimestamp, count) = tuple
+      val isAllowed = 1 <= rps
+      if (isAllowed) rpsCounter.addOne(user -> (Instant.now(), 1))
+      isAllowed
+    } { case (beginningOfTime, count) =>
       val now = Instant.now
-      val duration = Duration.between(oldTimestamp, now).toMillis;
-      if (duration >= 1000) {
-        rpsCounter.replace(user, (now, 1))
-        1 <= rps
-      } else {
-        val newCount = count + 1
-        rpsCounter.replace(user, (oldTimestamp, newCount))
-        count * (1 - duration/100/10.0) + 1 <= rps
-      }
+      val duration = Duration.between(beginningOfTime, now).toMillis
+      val roundedDuration: Double = (duration / 1000.0 * 10).toLong / 10.0
+      val adjustedDuration: Double = if (roundedDuration < 1) 1 else roundedDuration
+      val isAllowed = (count + 1) <= rps * adjustedDuration
+      if (isAllowed) rpsCounter.replace(user, (beginningOfTime, count + 1))
+      isAllowed
     }
 
     token match {
