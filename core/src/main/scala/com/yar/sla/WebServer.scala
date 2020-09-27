@@ -1,4 +1,5 @@
 import akka.actor.ActorSystem
+import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
@@ -38,7 +39,7 @@ object WebServer {
     "tk2" -> "Chris"
   )
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     def greetUser(authToken: Option[String], message: Option[String]) = complete {
       val userName = authToken.flatMap(users.get).fold("guest")(identity)
       s"Hello $userName!" + message.fold("")(" " + _)
@@ -49,17 +50,23 @@ object WebServer {
       case x         => None
     }
 
+    val consoleLog = Logging(system.eventStream, "STDOUT")
+
     val route = optionalHeaderValueByName("Authorization") { authToken =>
-      concat (
-        path("noThrottle") & get & greetUser(authToken, None),
-        (pathSingleSlash & get) {
-          if (ts.isRequestAllowed(authToken)) {
-            greetUser(authToken, Some("Welcome to ThrottlingService!"))
-          } else {
-            complete(StatusCodes.TooManyRequests)
-          }
+      withLog(consoleLog) {
+        logRequestResult("logRequestResult") {
+          concat(
+            path("noThrottle") & get & greetUser(authToken, None),
+            (pathSingleSlash & get) {
+              if (ts.isRequestAllowed(authToken)) {
+                greetUser(authToken, Some("Welcome to ThrottlingService!"))
+              } else {
+                complete(StatusCodes.TooManyRequests)
+              }
+            }
+          )
         }
-      )
+      }
     }
 
     val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)

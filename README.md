@@ -44,16 +44,18 @@ limit is reached, after 1/10 second ThrottlingService should allow
 costly to call (~250ms per request), so consider caching SLA
 requests. Also, you should not query the service, if the same token
 request is already in progress.
-7. Consider that REST service average response time is bellow 5ms,
+7. Consider that REST service average response time is below 5ms,
 ThrottlingService shouldn’t impact REST service SLA.
 
 Acceptance Criteria
 -------
-1. Implement `ThrottlingService`
-2. Cover the code with the tests that prove the validity of the code
-3. Implement the load test that proves that for *N* users, *K* rsp during *T*
-seconds around *T\*N\*K* requests were successful. Measure the
-overhead of using `ThrottlingService` service, compared with same
-rest endpoint without `ThrottlingService`
+1. Implement `ThrottlingService`.
+2. Cover the code with the tests that prove the validity of the code.
+3. Implement the load test that proves that for *N* users, *K* RPS during *T*
+seconds around *T\*N\*K* requests were successful. 
+4. Measure the
+overhead of using `ThrottlingService`, compared with same
+rest endpoint without `ThrottlingService`.
+
 Our actual REST services use scala/java, spray, akka, maven.
 For this assignment you can use any frameworks you prefer.
