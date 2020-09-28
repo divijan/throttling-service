@@ -50,26 +50,20 @@ object WebServer {
       case x         => None
     }
 
-    val consoleLog = Logging(system.eventStream, "STDOUT")
-
     val route = optionalHeaderValueByName("Authorization") { authToken =>
-      withLog(consoleLog) {
-        logRequestResult("logRequestResult") {
-          concat(
-            path("noThrottle") & get & greetUser(authToken, None),
-            (pathSingleSlash & get) {
-              if (ts.isRequestAllowed(authToken)) {
-                greetUser(authToken, Some("Welcome to ThrottlingService!"))
-              } else {
-                complete(StatusCodes.TooManyRequests)
-              }
-            }
-          )
+      concat(
+        path("noThrottle") & get & greetUser(authToken, None),
+        (pathSingleSlash & get) {
+          if (ts.isRequestAllowed(authToken)) {
+            greetUser(authToken, Some("Welcome to ThrottlingService!"))
+          } else {
+            complete(StatusCodes.TooManyRequests)
+          }
         }
-      }
+      )
     }
 
-    val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)
+    val bindingFuture = Http().bindAndHandle(logRequestResult("", Logging.InfoLevel)(route), "localhost", 8080)
 
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return
