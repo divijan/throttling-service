@@ -59,3 +59,5 @@ rest endpoint without `ThrottlingService`.
 
 Our actual REST services use scala/java, spray, akka, maven.
 For this assignment you can use any frameworks you prefer.
+
+© 2020 Yaroslav Ilich
